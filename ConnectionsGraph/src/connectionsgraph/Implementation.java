@@ -12,8 +12,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-//import net.yadan.banana.map.HashMap;
-//import net.yadan.banana.map.IHashMap;
 
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -22,12 +20,9 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
-import java.security.KeyException;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.HashSet;
-import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
@@ -39,118 +34,18 @@ import java.util.stream.Stream;
  * @author Max
  */
 public class Implementation {
-
-    private enum COMMAND_TYPE {
-        PROVISION,
-        READ_PROVISION,
-        GET_FRIENDS,
-        ARE_FIRST_DEGREE,
-        ARE_SECOND_DEGREE,
-        ARE_THIRD_DEGREE
-    }
-
-    class Command {
-
-        COMMAND_TYPE type;
-        HashMap parameters;
-
-        Command(COMMAND_TYPE type, HashMap parameters) {
-            this.type = type;
-            this.parameters = parameters;
-        }
-
-        public Object get(Object key) throws NullPointerException, KeyException {
-            if (parameters != null) {
-                return parameters.get(key);
-            }
-            throw new NullPointerException("Command.parameters is null.");
-        }
-    }
-
-    class ProvisionCommand extends Command {
-
-        private ProvisionCommand(COMMAND_TYPE type, HashMap paramters) {
-            super(type, paramters);
-        }
-
-        ProvisionCommand(Path path, long nUsers, int avg, float std) {
-            super(COMMAND_TYPE.PROVISION, null);
-            parameters = new HashMap(4);
-            parameters.put("path", path);
-            parameters.put("nUsers", nUsers);
-            parameters.put("avg", avg);
-            parameters.put("std", std);
-        }
-    }
-
-    class ReadProvisionCommand extends Command {
-
-        private ReadProvisionCommand(COMMAND_TYPE type, HashMap paramters) {
-            super(type, paramters);
-        }
-
-        ReadProvisionCommand(Path path) {
-            super(COMMAND_TYPE.READ_PROVISION, null);
-            parameters = new HashMap(1);
-            parameters.put("path", path);
-        }
-    }
-
-    class GetFriendsCommand extends Command {
-
-        private GetFriendsCommand(COMMAND_TYPE type, HashMap paramters) {
-            super(type, paramters);
-        }
-
-        GetFriendsCommand(int uid) {
-            super(COMMAND_TYPE.GET_FRIENDS, null);
-            parameters = new HashMap(1);
-            parameters.put("uid", uid);
-        }
-    }
-
-    class AreFirstDegreeCommand extends Command {
-
-        private AreFirstDegreeCommand(COMMAND_TYPE type, HashMap paramters) {
-            super(type, paramters);
-        }
-
-        AreFirstDegreeCommand(int uid, int uid2) {
-            super(COMMAND_TYPE.ARE_FIRST_DEGREE, null);
-            parameters = new HashMap(1);
-            parameters.put("uid", uid);
-            parameters.put("uid2", uid2);
-        }
-    }
-
-    class AreSecondDegreeCommand extends Command {
-
-        private AreSecondDegreeCommand(COMMAND_TYPE type, HashMap paramters) {
-            super(type, paramters);
-        }
-
-        AreSecondDegreeCommand(int uid, int uid2) {
-            super(COMMAND_TYPE.ARE_SECOND_DEGREE, null);
-            parameters = new HashMap(1);
-            parameters.put("uid", uid);
-            parameters.put("uid2", uid2);
-        }
-    }
-
-    class AreThirdDegreeCommand extends Command {
-
-        private AreThirdDegreeCommand(COMMAND_TYPE type, HashMap paramters) {
-            super(type, paramters);
-        }
-
-        AreThirdDegreeCommand(int uid, int uid2) {
-            super(COMMAND_TYPE.ARE_THIRD_DEGREE, null);
-            parameters = new HashMap(1);
-            parameters.put("uid", uid);
-            parameters.put("uid2", uid2);
-        }
-    }
-
+    
+    private String RUN_PROVISION_FIRST = "Please call \"provision\" first.";
+    private String UNKNOWN_COMMAND = "Unknown command.";
+    private String WRONG_PARAMETERS = "Wrong number of parameters.";
+    private String PATH_NOT_FOUND = "Path not found.";
+    private String DIRECTORY_NOT_EMPTY = "Directory not empty.";
+    private String NOT_A_DIRECTORY = "The given path is not a directory.";    
+    private String OK = "OK";
+    
+    /**
+     * Infinite loop in which we accept connections and respond to requests
+     */
     public void run() throws IOException {
         try (ServerSocket listener = new ServerSocket(9090)) {
             while (true) {
@@ -170,23 +65,25 @@ public class Implementation {
     }
 
     /**
+     * Populates a directory according to the specified parameters
+     * 
      * @param path The path used to store the data
      * @param nUsers The number of users to generate
      * @param avg The average number of friends each user has
-     * @param std The stdandard deviation of the user distribution
+     * @param std The stdandard deviation of the friends distribution
      */
-    private void provision(Path path, long nUsers, int avg, float std)
+    private void populate(Path path, long nUsers, int avg, float std)
             throws FileNotFoundException, IOException, URISyntaxException {
 
         if (Files.notExists(path)) {
-            throw new FileNotFoundException("Storage directory not found.");
+            throw new FileNotFoundException(PATH_NOT_FOUND);
         } else if (!Files.isDirectory(path)) {
-            throw new IOException("The given storage path is not a directory.");
+            throw new IOException(NOT_A_DIRECTORY);
         }
 
         Stream<Path> list = Files.list(path);
         if (list.count() > 0) {
-            throw new IOException("Storage diretory is not empty.");
+            throw new IOException(DIRECTORY_NOT_EMPTY);
         }
 
         Random rnd = new Random();
@@ -223,12 +120,20 @@ public class Implementation {
     private Hashtable<Integer, List> friendsMap = null;
     private boolean provisioned = false;
 
-    private void readProvision(Path path)
+    /**
+     * Reads data from a directory and populates in memory data structures
+     * 
+     * @param path The path used to store the data
+     * @param nUsers The number of users to generate
+     * @param avg The average number of friends each user has
+     * @param std The stdandard deviation of the friends distribution
+     */
+    private void provision(Path path)
             throws FileNotFoundException, IOException {
         if (Files.notExists(path)) {
-            throw new FileNotFoundException("Storage directory not found.");
+            throw new FileNotFoundException(PATH_NOT_FOUND);
         } else if (!Files.isDirectory(path)) {
-            throw new IOException("The given storage path is not a directory.");
+            throw new IOException(NOT_A_DIRECTORY);
         }
 
         firstDegreeSet = new HashSet();
@@ -270,18 +175,35 @@ public class Implementation {
         provisioned = true;
     }
 
+    /**
+     * Returns the friends for a given user id
+     * 
+     * @param uid The id of the user of whom to get the friends list
+     * 
+     * @return A List of int user ids
+     *
+     * @throws Exception
+     */
     private List getFriends(int uid)
             throws Exception {
         if (!provisioned) {
-            throw new Exception("Please run readProvision first.");
+            throw new Exception(RUN_PROVISION_FIRST);
         }
         return friendsMap.get(uid);
     }
 
+    /**
+     * Returns true if the users are directly friends, false o.w.
+     * 
+     * @param uid First user id to use for lookup
+     * @param uid2 Second user id to use for lookup
+     *
+     * @throws Exception
+     */
     private boolean areFirstDegree(int uid, int uid2)
             throws Exception {
         if (!provisioned) {
-            throw new Exception("Please run readProvision first.");
+            throw new Exception(RUN_PROVISION_FIRST);
         }
         boolean result = false;
         long relationship = (long) uid << 32 | (long) uid2;
@@ -291,10 +213,18 @@ public class Implementation {
         return result;
     }
 
+    /**
+     * Returns true if the users are 2nd degree connected (friend of friend)
+     * 
+     * @param uid First user id to use for lookup
+     * @param uid2 Second user id to use for lookup
+     *
+     * @throws Exception
+     */
     private boolean areSecondDegree(int uid, int uid2)
             throws Exception {
         if (!provisioned) {
-            throw new Exception("Please run readProvision first.");
+            throw new Exception(RUN_PROVISION_FIRST);
         }
         boolean result = false;
         long relationship = (long) uid << 32 | (long) uid2;
@@ -304,10 +234,18 @@ public class Implementation {
         return result;
     }
 
+    /**
+     * Returns true if the users are 3rd degree connected (friend of friend of friend)
+     * 
+     * @param uid First user id to use for lookup
+     * @param uid2 Second user id to use for lookup
+     * 
+     * @throws Exception
+     */    
     private boolean areThirdDegree(int uid, int uid2)
             throws Exception {
         if (!provisioned) {
-            throw new Exception("Please run readProvision first.");
+            throw new Exception(RUN_PROVISION_FIRST);
         }
         boolean result = false;
         List friends = friendsMap.get(uid);
@@ -329,6 +267,15 @@ public class Implementation {
         return result;
     }
 
+    /**
+     * Parses the given command line 
+     * 
+     * @param command Command line
+     * 
+     * @return <? extends Command> object or throws
+     * 
+     * @throws Exception
+     */
     private Command parseCommand(String command)
             throws Exception {
         Command result = null;
@@ -344,33 +291,33 @@ public class Implementation {
         if (split.length > 0) {
             String cmdSlice = split[0];
             switch (cmdSlice) {
-                case "provision":
+                case "populate":
                     if (split.length < 5 || split.length > 5) {
-                        throw new Exception("Wrong number of parameters.");
+                        throw new Exception(WRONG_PARAMETERS);
                     }
                     path = Paths.get(split[1]);
                     nUsers = Long.parseLong(split[2]);
                     avg = Integer.parseInt(split[3]);
                     std = Float.parseFloat(split[4]);
-                    result = new ProvisionCommand(path, nUsers, avg, std);
+                    result = new PopulateCommand(path, nUsers, avg, std);
                     break;
-                case "readProvision":
+                case "provision":
                     if (split.length < 2 || split.length > 2) {
-                        throw new Exception("Wrong number of parameters.");
+                        throw new Exception(WRONG_PARAMETERS);
                     }
                     path = Paths.get(split[1]);
-                    result = new ReadProvisionCommand(path);
+                    result = new ProvisionCommand(path);
                     break;
                 case "getFriends":
                     if (split.length < 2 || split.length > 2) {
-                        throw new Exception("Wrong number of parameters.");
+                        throw new Exception(WRONG_PARAMETERS);
                     }
                     uid = Integer.parseInt(split[1]);
                     result = new GetFriendsCommand(uid);
                     break;
                 case "areFirstDegree":
                     if (split.length < 3 || split.length > 3) {
-                        throw new Exception("Wrong number of parameters.");
+                        throw new Exception(WRONG_PARAMETERS);
                     }
                     uid = Integer.parseInt(split[1]);
                     uid2 = Integer.parseInt(split[2]);
@@ -378,7 +325,7 @@ public class Implementation {
                     break;
                 case "areSecondDegree":
                     if (split.length < 3 || split.length > 3) {
-                        throw new Exception("Wrong number of parameters.");
+                        throw new Exception(WRONG_PARAMETERS);
                     }
                     uid = Integer.parseInt(split[1]);
                     uid2 = Integer.parseInt(split[2]);
@@ -386,7 +333,7 @@ public class Implementation {
                     break;
                 case "areThirdDegree":
                     if (split.length < 3 || split.length > 3) {
-                        throw new Exception("Wrong number of parameters.");
+                        throw new Exception(WRONG_PARAMETERS);
                     }
                     uid = Integer.parseInt(split[1]);
                     uid2 = Integer.parseInt(split[2]);
@@ -398,6 +345,14 @@ public class Implementation {
         return result;
     }
 
+    /**
+     * Responds to the given command by writing to "writer"
+     * 
+     * @param command line
+     * @param writer A BufferedWriter
+     * 
+     * @throws IOException
+     */
     private void respond(String command, BufferedWriter writer)
             throws IOException {
         try {
@@ -405,19 +360,22 @@ public class Implementation {
 
             if (cmd != null) {
                 switch (cmd.type) {
-                    case PROVISION:
-                        provision((Path) cmd.get("path"), (long) cmd.get("nUsers"),
+                    case POPULATE:
+                        populate((Path) cmd.get("path"), (long) cmd.get("nUsers"),
                                 (int) cmd.get("avg"), (float) cmd.get("std"));
-                        writer.write("OK");
+                        writer.write(OK);
                         writer.newLine();
                         break;
-                    case READ_PROVISION:
-                        readProvision((Path) cmd.get("path"));
-                        writer.write("OK");
+                    case PROVISION:
+                        provision((Path) cmd.get("path"));
+                        writer.write(OK);
                         writer.newLine();
                         break;
                     case GET_FRIENDS:
                         List friends = getFriends((int)cmd.get("uid"));
+                        
+                        // Could probably use Stream.map, but it's really that
+                        // simple...
                         int size = friends.size();
                         for(int i=0; i<size; ++i){
                             writer.write(Integer.toString((int)friends.get(i)));
@@ -425,8 +383,9 @@ public class Implementation {
                                 writer.write(", ");
                             }
                         }
+                        
                         writer.newLine();
-                        writer.write("OK");
+                        writer.write(OK);
                         writer.newLine();
                         break;
                     case ARE_FIRST_DEGREE:
@@ -457,16 +416,15 @@ public class Implementation {
                         }
                         break;
                     default:
-                        writer.write("Unknown command.");
+                        writer.write(UNKNOWN_COMMAND);
                         writer.newLine();
                         break;
                 }
             } else {
-                writer.write("Unknown command.");
+                writer.write(UNKNOWN_COMMAND);
                 writer.newLine();
             }
         } catch (Exception ex) {
-//            Logger.getLogger(Implementation.class.getName()).log(Level.SEVERE, null, ex);
             try {
                 writer.write("Exception: "+ex.getMessage());
                 writer.newLine();
