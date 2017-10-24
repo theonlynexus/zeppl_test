@@ -43,6 +43,11 @@ public class Implementation {
     private String NOT_A_DIRECTORY = "The given path is not a directory.";    
     private String OK = "OK";
     
+    private HashSet firstDegreeSet = null;
+    private HashSet secondDegreeSet = null;
+    private Hashtable<Integer, List> friendsMap = null;
+    private boolean provisioned = false;
+    
     /**
      * Infinite loop in which we accept connections and respond to requests
      */
@@ -114,11 +119,6 @@ public class Implementation {
             }
         }
     }
-
-    private HashSet firstDegreeSet = null;
-    private HashSet secondDegreeSet = null;
-    private Hashtable<Integer, List> friendsMap = null;
-    private boolean provisioned = false;
 
     /**
      * Reads data from a directory and populates in memory data structures
