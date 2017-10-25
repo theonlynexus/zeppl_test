@@ -39,17 +39,19 @@ import java.util.stream.Stream;
 public class Implementation {
 
     private String RUN_PROVISION_FIRST = "Please call \"provision\" first.";
-    private String UNKNOWN_COMMAND = "Unknown command.";
-    private String WRONG_PARAMETERS = "Wrong number of parameters.";
-    private String PATH_NOT_FOUND = "Path not found.";
-    private String DIRECTORY_NOT_EMPTY = "Directory not empty.";
-    private String NOT_A_DIRECTORY = "The given path is not a directory.";
-    private String OK = "OK";
+    private String UNKNOWN_COMMAND = "Unknown command.\n";
+    private String WRONG_PARAMETERS = "Wrong number of parameters.\n";
+    private String PATH_NOT_FOUND = "Path not found.\n";
+    private String DIRECTORY_NOT_EMPTY = "Directory not empty.\n";
+    private String NOT_A_DIRECTORY = "The given path is not a directory.\n";
+    private String OK = "OK\n";
+    private String PROMPT = ">";
 
     private HashSet firstDegreeSet = null;
     private HashSet secondDegreeSet = null;
     private Hashtable<Integer, List> friendsMap = null;
     private boolean provisioned = false;
+    Random rnd = new Random();
 
     /**
      * Infinite loop in which we accept connections and respond to requests
@@ -58,12 +60,15 @@ public class Implementation {
         try (ServerSocket listener = new ServerSocket(9090)) {
             while (true) {
                 try (Socket socket = listener.accept()) {
+                    BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(socket.getInputStream()));
+                    OutputStreamWriter writer = new OutputStreamWriter(socket.getOutputStream());
                     while (!socket.isClosed()) {
-                        BufferedReader reader = new BufferedReader(
-                                new InputStreamReader(socket.getInputStream()));
+                        if (!socket.isClosed()) {
+                            writer.write(PROMPT);
+                            writer.flush();
+                        }
                         String line = reader.readLine();
-                        BufferedWriter writer = new BufferedWriter(
-                                new OutputStreamWriter(socket.getOutputStream()));
                         respond(line, writer);
                         if (!socket.isClosed()) {
                             writer.flush();
@@ -77,6 +82,14 @@ public class Implementation {
     }
 
     /**
+     * Sets the seed for the random generator
+     */
+    void setSeed(long seed) {
+        rnd = new Random();
+        rnd.setSeed(seed);
+    }
+
+    /**
      * Populates a directory according to the specified parameters
      *
      * @param path The path used to store the data
@@ -84,7 +97,7 @@ public class Implementation {
      * @param avg The average number of friends each user has
      * @param std The stdandard deviation of the friends distribution
      */
-    private void populate(Path path, long nUsers, int avg, float std)
+    void populate(Path path, long nUsers, int avg, float std)
             throws FileNotFoundException, IOException, URISyntaxException {
 
         if (Files.notExists(path)) {
@@ -98,7 +111,6 @@ public class Implementation {
             throw new IOException(DIRECTORY_NOT_EMPTY);
         }
 
-        Random rnd = new Random();
         HashSet friends = new HashSet();
         for (long userId = 0; userId < nUsers; ++userId) {
             friends.clear();
@@ -135,7 +147,7 @@ public class Implementation {
      * @param avg The average number of friends each user has
      * @param std The stdandard deviation of the friends distribution
      */
-    private void provision(Path path)
+    void provision(Path path)
             throws FileNotFoundException, IOException {
         if (Files.notExists(path)) {
             throw new FileNotFoundException(PATH_NOT_FOUND);
@@ -191,7 +203,7 @@ public class Implementation {
      *
      * @throws Exception
      */
-    private List getFriends(int uid)
+    List getFriends(int uid)
             throws Exception {
         if (!provisioned) {
             throw new Exception(RUN_PROVISION_FIRST);
@@ -207,7 +219,7 @@ public class Implementation {
      *
      * @throws Exception
      */
-    private boolean areFirstDegree(int uid, int uid2)
+    boolean areFirstDegree(int uid, int uid2)
             throws Exception {
         if (!provisioned) {
             throw new Exception(RUN_PROVISION_FIRST);
@@ -228,7 +240,7 @@ public class Implementation {
      *
      * @throws Exception
      */
-    private boolean areSecondDegree(int uid, int uid2)
+    boolean areSecondDegree(int uid, int uid2)
             throws Exception {
         if (!provisioned) {
             throw new Exception(RUN_PROVISION_FIRST);
@@ -250,7 +262,7 @@ public class Implementation {
      *
      * @throws Exception
      */
-    private boolean areThirdDegree(int uid, int uid2)
+    boolean areThirdDegree(int uid, int uid2)
             throws Exception {
         if (!provisioned) {
             throw new Exception(RUN_PROVISION_FIRST);
@@ -296,7 +308,7 @@ public class Implementation {
         float std;
         int uid, uid2;
 
-        Pattern commandPattern = Pattern.compile("^(quit|populate|provision|getFriends|areFirstDegree|areSecondDegree|areThirdDegree)([(](.*)[)])$");
+        Pattern commandPattern = Pattern.compile("^(quit|setSeed|populate|provision|getFriends|areFirstDegree|areSecondDegree|areThirdDegree)([(](.*)[)])$");
         Matcher m = commandPattern.matcher(commandLine);
         boolean matches = m.matches();
 
@@ -307,6 +319,13 @@ public class Implementation {
             switch (command) {
                 case "quit":
                     result = new QuitCommand();
+                    break;
+                case "setSeed":
+                    if (paramArray.length < 1 || paramArray.length > 1) {
+                        throw new Exception(WRONG_PARAMETERS);
+                    }
+                    long seed = Long.parseLong(paramArray[0]);
+                    result = new SetSeedCommand(seed);
                     break;
                 case "populate":
                     if (paramArray.length < 4 || paramArray.length > 4) {
@@ -370,7 +389,7 @@ public class Implementation {
      *
      * @throws IOException
      */
-    private void respond(String command, BufferedWriter writer)
+    private void respond(String command, OutputStreamWriter writer)
             throws IOException {
         try {
             Command cmd = parseCommand(command.trim());
@@ -380,22 +399,28 @@ public class Implementation {
                     case QUIT:
                         writer.close();
                         break;
+                    case SET_SEED:
+                        SetSeedCommand setSeedCmd = (SetSeedCommand) cmd;
+                        setSeed(setSeedCmd.getSeed());
+                        writer.write(OK);                        
+                        break;
                     case POPULATE:
-                        populate((Path) cmd.get("path"), (long) cmd.get("nUsers"),
-                                (int) cmd.get("avg"), (float) cmd.get("std"));
+                        PopulateCommand populateCmd = (PopulateCommand) cmd;
+                        populate(populateCmd.getPath(), populateCmd.getNUsers(),
+                                populateCmd.getAvg(), populateCmd.getStd());
                         writer.write(OK);
-                        writer.newLine();
                         break;
                     case PROVISION:
-                        provision((Path) cmd.get("path"));
+                        ProvisionCommand provisionCmd = (ProvisionCommand) cmd;
+                        provision(provisionCmd.getPah());
                         writer.write(OK);
-                        writer.newLine();
                         break;
                     case GET_FRIENDS:
-                        List friends = getFriends((int) cmd.get("uid"));
+                        GetFriendsCommand getFriendsCmd = (GetFriendsCommand) cmd;
+                        List friends = getFriends(getFriendsCmd.getUid());
 
-                        // Could probably use Stream.map, but it's really that
-                        // simple...
+                        // Could probably use Stream.map and String.join, but 
+                        // it's really that simple...
                         int size = friends.size();
                         for (int i = 0; i < size; ++i) {
                             writer.write(Integer.toString((int) friends.get(i)));
@@ -403,51 +428,46 @@ public class Implementation {
                                 writer.write(", ");
                             }
                         }
-
-                        writer.newLine();
+                        writer.write("\n");
                         writer.write(OK);
-                        writer.newLine();
                         break;
                     case ARE_FIRST_DEGREE:
-                        if (areFirstDegree((int) cmd.get("uid"), (int) cmd.get("uid2"))) {
-                            writer.write("True");
-                            writer.newLine();
+                        AreFirstDegreeCommand areFirstDegreeCmd = (AreFirstDegreeCommand) cmd;
+                        if (areFirstDegree(areFirstDegreeCmd.getUid(), areFirstDegreeCmd.getUid2())) {
+                            writer.write("True\n");
                         } else {
-                            writer.write("False");
-                            writer.newLine();
+                            writer.write("False\n");
                         }
+                        writer.write(OK);
                         break;
                     case ARE_SECOND_DEGREE:
-                        if (areSecondDegree((int) cmd.get("uid"), (int) cmd.get("uid2"))) {
-                            writer.write("True");
-                            writer.newLine();
+                        AreSecondDegreeCommand areSecondDegreeCmd = (AreSecondDegreeCommand) cmd;
+                        if (areSecondDegree(areSecondDegreeCmd.getUid(), areSecondDegreeCmd.getUid2())) {
+                            writer.write("True\n");
                         } else {
-                            writer.write("False");
-                            writer.newLine();
+                            writer.write("False\n");
                         }
+                        writer.write(OK);
                         break;
                     case ARE_THIRD_DEGREE:
-                        if (areThirdDegree((int) cmd.get("uid"), (int) cmd.get("uid2"))) {
-                            writer.write("True");
-                            writer.newLine();
+                        AreThirdDegreeCommand areThirdDegreeCmd = (AreThirdDegreeCommand) cmd;
+                        if (areThirdDegree(areThirdDegreeCmd.getUid(), areThirdDegreeCmd.getUid2())) {
+                            writer.write("True\n");
                         } else {
-                            writer.write("False");
-                            writer.newLine();
+                            writer.write("False\n");
                         }
+                        writer.write(OK);
                         break;
                     default:
                         writer.write(UNKNOWN_COMMAND);
-                        writer.newLine();
                         break;
                 }
             } else {
                 writer.write(UNKNOWN_COMMAND);
-                writer.newLine();
             }
         } catch (Exception ex) {
             try {
-                writer.write("Exception: " + ex.getMessage());
-                writer.newLine();
+                writer.write("Exception: " + ex.getMessage()+"\n");
             } catch (IOException ex2) {
                 // Ignore Exceptions while writing error message to client
             }

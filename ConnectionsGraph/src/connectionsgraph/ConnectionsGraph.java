@@ -24,6 +24,5 @@ public class ConnectionsGraph {
         } catch (IOException ex) {
             throw new Exception("Exception handler not yet implemented");
         }
-
     }
 }
