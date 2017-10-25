@@ -16,6 +16,7 @@ import java.util.HashMap;
 class Command {
     
     enum COMMAND_TYPE {
+        QUIT,
         POPULATE,
         PROVISION,
         GET_FRIENDS,
@@ -39,11 +40,22 @@ class Command {
             throw new NullPointerException("Command.parameters is null.");
         }
     }
+    
+    class QuitCommand extends Command {
+        private QuitCommand(COMMAND_TYPE type, HashMap params) {
+            super(type, params);
+        }
+
+        QuitCommand() {
+            super(COMMAND_TYPE.QUIT, null);
+        }
+    }
+
 
     class PopulateCommand extends Command {
 
-        private PopulateCommand(COMMAND_TYPE type, HashMap paramters) {
-            super(type, paramters);
+        private PopulateCommand(COMMAND_TYPE type, HashMap params) {
+            super(type, params);
         }
 
         PopulateCommand(Path path, long nUsers, int avg, float std) {
@@ -58,8 +70,8 @@ class Command {
 
     class ProvisionCommand extends Command {
 
-        private ProvisionCommand(COMMAND_TYPE type, HashMap paramters) {
-            super(type, paramters);
+        private ProvisionCommand(COMMAND_TYPE type, HashMap params) {
+            super(type, params);
         }
 
         ProvisionCommand(Path path) {
@@ -71,8 +83,8 @@ class Command {
 
     class GetFriendsCommand extends Command {
 
-        private GetFriendsCommand(COMMAND_TYPE type, HashMap paramters) {
-            super(type, paramters);
+        private GetFriendsCommand(COMMAND_TYPE type, HashMap params) {
+            super(type, params);
         }
 
         GetFriendsCommand(int uid) {
@@ -84,8 +96,8 @@ class Command {
 
     class AreFirstDegreeCommand extends Command {
 
-        private AreFirstDegreeCommand(COMMAND_TYPE type, HashMap paramters) {
-            super(type, paramters);
+        private AreFirstDegreeCommand(COMMAND_TYPE type, HashMap params) {
+            super(type, params);
         }
 
         AreFirstDegreeCommand(int uid, int uid2) {
@@ -98,8 +110,8 @@ class Command {
 
     class AreSecondDegreeCommand extends Command {
 
-        private AreSecondDegreeCommand(COMMAND_TYPE type, HashMap paramters) {
-            super(type, paramters);
+        private AreSecondDegreeCommand(COMMAND_TYPE type, HashMap params) {
+            super(type, params);
         }
 
         AreSecondDegreeCommand(int uid, int uid2) {
@@ -112,8 +124,8 @@ class Command {
 
     class AreThirdDegreeCommand extends Command {
 
-        private AreThirdDegreeCommand(COMMAND_TYPE type, HashMap paramters) {
-            super(type, paramters);
+        private AreThirdDegreeCommand(COMMAND_TYPE type, HashMap params) {
+            super(type, params);
         }
 
         AreThirdDegreeCommand(int uid, int uid2) {

@@ -15,6 +15,7 @@ import java.io.OutputStreamWriter;
 
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
@@ -27,6 +28,8 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -34,20 +37,20 @@ import java.util.stream.Stream;
  * @author Max
  */
 public class Implementation {
-    
+
     private String RUN_PROVISION_FIRST = "Please call \"provision\" first.";
     private String UNKNOWN_COMMAND = "Unknown command.";
     private String WRONG_PARAMETERS = "Wrong number of parameters.";
     private String PATH_NOT_FOUND = "Path not found.";
     private String DIRECTORY_NOT_EMPTY = "Directory not empty.";
-    private String NOT_A_DIRECTORY = "The given path is not a directory.";    
+    private String NOT_A_DIRECTORY = "The given path is not a directory.";
     private String OK = "OK";
-    
+
     private HashSet firstDegreeSet = null;
     private HashSet secondDegreeSet = null;
     private Hashtable<Integer, List> friendsMap = null;
     private boolean provisioned = false;
-    
+
     /**
      * Infinite loop in which we accept connections and respond to requests
      */
@@ -62,8 +65,12 @@ public class Implementation {
                         BufferedWriter writer = new BufferedWriter(
                                 new OutputStreamWriter(socket.getOutputStream()));
                         respond(line, writer);
-                        writer.flush();
+                        if (!socket.isClosed()) {
+                            writer.flush();
+                        }
                     }
+                } catch (SocketException ex) {
+                    // Ignore socket exceptions
                 }
             }
         }
@@ -71,7 +78,7 @@ public class Implementation {
 
     /**
      * Populates a directory according to the specified parameters
-     * 
+     *
      * @param path The path used to store the data
      * @param nUsers The number of users to generate
      * @param avg The average number of friends each user has
@@ -122,7 +129,7 @@ public class Implementation {
 
     /**
      * Reads data from a directory and populates in memory data structures
-     * 
+     *
      * @param path The path used to store the data
      * @param nUsers The number of users to generate
      * @param avg The average number of friends each user has
@@ -139,16 +146,16 @@ public class Implementation {
         firstDegreeSet = new HashSet();
         secondDegreeSet = new HashSet();
         friendsMap = new Hashtable<Integer, List>();
-        
+
         File[] files = path.toFile().listFiles();
-        for(int i=0; i<files.length; ++i){
+        for (int i = 0; i < files.length; ++i) {
             File file = files[i];
             if (file.isDirectory()) {
                 int uid1 = Integer.parseInt(file.getName());
-                List friends = new ArrayList();                
+                List friends = new ArrayList();
                 File[] innerFiles = file.listFiles();
-                
-                for(int j=0; j<innerFiles.length; ++j){
+
+                for (int j = 0; j < innerFiles.length; ++j) {
                     File innferFile = innerFiles[j];
                     if (innferFile.isFile()) {
                         int uid2 = Integer.parseInt(innferFile.getName());
@@ -159,7 +166,7 @@ public class Implementation {
                 }
                 friendsMap.put(uid1, friends);
             }
-        
+
         }
         friendsMap.keySet().forEach((Integer uid1) -> {
             friendsMap.get(uid1).forEach((Object obj) -> {
@@ -177,9 +184,9 @@ public class Implementation {
 
     /**
      * Returns the friends for a given user id
-     * 
+     *
      * @param uid The id of the user of whom to get the friends list
-     * 
+     *
      * @return A List of int user ids
      *
      * @throws Exception
@@ -194,7 +201,7 @@ public class Implementation {
 
     /**
      * Returns true if the users are directly friends, false o.w.
-     * 
+     *
      * @param uid First user id to use for lookup
      * @param uid2 Second user id to use for lookup
      *
@@ -215,7 +222,7 @@ public class Implementation {
 
     /**
      * Returns true if the users are 2nd degree connected (friend of friend)
-     * 
+     *
      * @param uid First user id to use for lookup
      * @param uid2 Second user id to use for lookup
      *
@@ -235,13 +242,14 @@ public class Implementation {
     }
 
     /**
-     * Returns true if the users are 3rd degree connected (friend of friend of friend)
-     * 
+     * Returns true if the users are 3rd degree connected (friend of friend of
+     * friend)
+     *
      * @param uid First user id to use for lookup
      * @param uid2 Second user id to use for lookup
-     * 
+     *
      * @throws Exception
-     */    
+     */
     private boolean areThirdDegree(int uid, int uid2)
             throws Exception {
         if (!provisioned) {
@@ -268,19 +276,19 @@ public class Implementation {
     }
 
     /**
-     * Parses the given command line 
-     * 
-     * @param command Command line
-     * 
+     * Parses the given command line
+     *
+     * @param commandLine Command line
+     *
      * @return <? extends Command> object or throws
-     * 
+     *
      * @throws Exception
      */
-    private Command parseCommand(String command)
+    private Command parseCommand(String commandLine)
             throws Exception {
         Command result = null;
 
-        String[] split = command.split("\\s");
+        String[] split = commandLine.split("\\s");
 
         Path path;
         long nUsers;
@@ -288,55 +296,64 @@ public class Implementation {
         float std;
         int uid, uid2;
 
-        if (split.length > 0) {
-            String cmdSlice = split[0];
-            switch (cmdSlice) {
+        Pattern commandPattern = Pattern.compile("^(quit|populate|provision|getFriends|areFirstDegree|areSecondDegree|areThirdDegree)([(](.*)[)])$");
+        Matcher m = commandPattern.matcher(commandLine);
+        boolean matches = m.matches();
+
+        if (matches) {
+            String command = m.group(1);
+            String params = m.group(3);
+            String[] paramArray = params.split(",");
+            switch (command) {
+                case "quit":
+                    result = new QuitCommand();
+                    break;
                 case "populate":
-                    if (split.length < 5 || split.length > 5) {
+                    if (paramArray.length < 4 || paramArray.length > 4) {
                         throw new Exception(WRONG_PARAMETERS);
                     }
-                    path = Paths.get(split[1]);
-                    nUsers = Long.parseLong(split[2]);
-                    avg = Integer.parseInt(split[3]);
-                    std = Float.parseFloat(split[4]);
+                    path = Paths.get(paramArray[0].trim());
+                    nUsers = Long.parseLong(paramArray[1].trim());
+                    avg = Integer.parseInt(paramArray[2].trim());
+                    std = Float.parseFloat(paramArray[3].trim());
                     result = new PopulateCommand(path, nUsers, avg, std);
                     break;
                 case "provision":
-                    if (split.length < 2 || split.length > 2) {
+                    if (paramArray.length < 1 || paramArray.length > 1) {
                         throw new Exception(WRONG_PARAMETERS);
                     }
-                    path = Paths.get(split[1]);
+                    path = Paths.get(paramArray[0].trim());
                     result = new ProvisionCommand(path);
                     break;
                 case "getFriends":
-                    if (split.length < 2 || split.length > 2) {
+                    if (paramArray.length < 1 || paramArray.length > 1) {
                         throw new Exception(WRONG_PARAMETERS);
                     }
-                    uid = Integer.parseInt(split[1]);
+                    uid = Integer.parseInt(paramArray[0].trim());
                     result = new GetFriendsCommand(uid);
                     break;
                 case "areFirstDegree":
-                    if (split.length < 3 || split.length > 3) {
+                    if (paramArray.length < 2 || paramArray.length > 2) {
                         throw new Exception(WRONG_PARAMETERS);
                     }
-                    uid = Integer.parseInt(split[1]);
-                    uid2 = Integer.parseInt(split[2]);
+                    uid = Integer.parseInt(paramArray[0].trim());
+                    uid2 = Integer.parseInt(paramArray[1].trim());
                     result = new AreFirstDegreeCommand(uid, uid2);
                     break;
                 case "areSecondDegree":
-                    if (split.length < 3 || split.length > 3) {
+                    if (paramArray.length < 2 || paramArray.length > 2) {
                         throw new Exception(WRONG_PARAMETERS);
                     }
-                    uid = Integer.parseInt(split[1]);
-                    uid2 = Integer.parseInt(split[2]);
+                    uid = Integer.parseInt(paramArray[0].trim());
+                    uid2 = Integer.parseInt(paramArray[1].trim());
                     result = new AreSecondDegreeCommand(uid, uid2);
                     break;
                 case "areThirdDegree":
-                    if (split.length < 3 || split.length > 3) {
+                    if (paramArray.length < 2 || paramArray.length > 2) {
                         throw new Exception(WRONG_PARAMETERS);
                     }
-                    uid = Integer.parseInt(split[1]);
-                    uid2 = Integer.parseInt(split[2]);
+                    uid = Integer.parseInt(paramArray[0].trim());
+                    uid2 = Integer.parseInt(paramArray[1].trim());
                     result = new AreThirdDegreeCommand(uid, uid2);
                     break;
             }
@@ -346,20 +363,23 @@ public class Implementation {
     }
 
     /**
-     * Responds to the given command by writing to "writer"
-     * 
+     * Responds to the given command, outputs to <b>writer</b>
+     *
      * @param command line
      * @param writer A BufferedWriter
-     * 
+     *
      * @throws IOException
      */
     private void respond(String command, BufferedWriter writer)
             throws IOException {
         try {
-            Command cmd = parseCommand(command);
+            Command cmd = parseCommand(command.trim());
 
             if (cmd != null) {
                 switch (cmd.type) {
+                    case QUIT:
+                        writer.close();
+                        break;
                     case POPULATE:
                         populate((Path) cmd.get("path"), (long) cmd.get("nUsers"),
                                 (int) cmd.get("avg"), (float) cmd.get("std"));
@@ -372,18 +392,18 @@ public class Implementation {
                         writer.newLine();
                         break;
                     case GET_FRIENDS:
-                        List friends = getFriends((int)cmd.get("uid"));
-                        
+                        List friends = getFriends((int) cmd.get("uid"));
+
                         // Could probably use Stream.map, but it's really that
                         // simple...
                         int size = friends.size();
-                        for(int i=0; i<size; ++i){
-                            writer.write(Integer.toString((int)friends.get(i)));
-                            if( i<size-1 ){
+                        for (int i = 0; i < size; ++i) {
+                            writer.write(Integer.toString((int) friends.get(i)));
+                            if (i < size - 1) {
                                 writer.write(", ");
                             }
                         }
-                        
+
                         writer.newLine();
                         writer.write(OK);
                         writer.newLine();
@@ -426,7 +446,7 @@ public class Implementation {
             }
         } catch (Exception ex) {
             try {
-                writer.write("Exception: "+ex.getMessage());
+                writer.write("Exception: " + ex.getMessage());
                 writer.newLine();
             } catch (IOException ex2) {
                 // Ignore Exceptions while writing error message to client
