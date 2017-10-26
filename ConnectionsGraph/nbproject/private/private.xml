@@ -5,6 +5,7 @@
         <group>
             <file>file:/home/max/src/zeppl/ConnectionsGraph/src/connectionsgraph/Command.java</file>
             <file>file:/home/max/src/zeppl/ConnectionsGraph/src/connectionsgraph/Implementation.java</file>
+            <file>file:/home/max/src/zeppl/ConnectionsGraph/test/connectionsgraph/ConnectionsGraphTest.java</file>
             <file>file:/home/max/src/zeppl/ConnectionsGraph/src/connectionsgraph/ConnectionsGraph.java</file>
         </group>
     </open-files>
