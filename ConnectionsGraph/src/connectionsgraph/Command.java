@@ -67,7 +67,7 @@ class PopulateCommand extends Command {
         super(type, params);
     }
 
-    PopulateCommand(Path path, long nUsers, int avg, float std) {
+    PopulateCommand(Path path, int nUsers, int avg, float std) {
         super(COMMAND_TYPE.POPULATE, null);
         parameters = new HashMap(4);
         parameters.put("path", path);
@@ -80,8 +80,8 @@ class PopulateCommand extends Command {
         return (Path) parameters.get("path");
     }
 
-    long getNUsers() {
-        return (long) parameters.get("nUsers");
+    int getNUsers() {
+        return (int) parameters.get("nUsers");
     }
 
     int getAvg() {

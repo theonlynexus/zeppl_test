@@ -97,8 +97,8 @@ public class Implementation {
      * @param avg The average number of friends each user has
      * @param std The stdandard deviation of the friends distribution
      */
-    void populate(Path path, long nUsers, int avg, float std)
-            throws FileNotFoundException, IOException, URISyntaxException {
+    void populate(Path path, int nUsers, int avg, float std)
+            throws FileNotFoundException, IOException, Exception {
 
         if (Files.notExists(path)) {
             throw new FileNotFoundException(PATH_NOT_FOUND);
@@ -112,29 +112,70 @@ public class Implementation {
         }
 
         HashSet friends = new HashSet();
-        for (long userId = 0; userId < nUsers; ++userId) {
+
+        for (int userId = 0; userId < nUsers; ++userId) {
             friends.clear();
             Path userPath = Paths.get(new URI(
                     path.toUri().toString() + "/" + Long.toString(userId)));
             Files.createDirectory(userPath);
+        }
+
+        for (int userId = 0; userId < nUsers; ++userId) {
+            friends.clear();
+            Path userPath = Paths.get(
+                    path.toAbsolutePath().toString(), Integer.toString(userId));
 
             // Sample number of friends from a Gaussian distribution 
             // with mean = avg and standard deviation = std
             int nFriends = (int) Math.floor(rnd.nextGaussian() * std + avg);
 
+            // Add existing friends to hashset
+            Files.list(userPath).forEach((Path f) -> {
+                int friendId = Integer.parseInt(f.toFile().getName());
+                friends.add(friendId);
+            });
+
+            int retries = 0;
+            int lastFriend = 0;
             // Add friends to hashset
-            for (int i = 0; i < nFriends; ++i) {
+            for (int i = (int) Files.list(userPath).count(); i < nFriends; ++i) {
                 // Note: this is not quite the appropriate way, but random enough
-                long uid = Long.remainderUnsigned(rnd.nextLong(), nUsers);
-                if (!friends.add(uid)) {
-                    // Friend was already there, retry
-                    --i;
-                } else {
-                    // Create file
-                    Path friendPath = Paths.get(new URI(
-                            userPath.toUri().toString() + "/" + Long.toString(uid)));
-                    Files.createFile(friendPath);
+                int friendId = Integer.remainderUnsigned(rnd.nextInt(), nUsers);
+                
+                if( friendId == userId && friendId == lastFriend){
+                    friendId = Integer.remainderUnsigned(rnd.nextInt(), nUsers);
                 }
+                
+                Path user2Path = Paths.get(
+                        path.toAbsolutePath().toString(), Integer.toString(friendId));
+                
+                if(retries == 1000){
+                    // 1k is arbitrary but should be good enough
+                    throw new Exception("Retried too many times while populating directory.");
+                }
+                
+                if (friendId == userId
+                        || friends.contains(friendId)
+                        || (std == 0 && Files.list(user2Path).count() == avg)) {
+                    // Friend was already there,
+                    // friend is self,
+                    // or friend's 1st degree connections are already maxed out.
+                    // Retry!
+                    --i;
+                    retries++;
+                } else {
+                    friends.add(friendId);
+                    retries = 0;
+                    // Create file
+                    Path friendPath = Paths.get(
+                            userPath.toAbsolutePath().toString(), Integer.toString(friendId));
+                    Files.createFile(friendPath);
+
+                    Path reverseFriendPath = Paths.get(
+                            user2Path.toAbsolutePath().toString(), Integer.toString(userId));
+                    Files.createFile(reverseFriendPath);
+                }
+                lastFriend = friendId;
             }
         }
     }
@@ -143,9 +184,6 @@ public class Implementation {
      * Reads data from a directory and populates in memory data structures
      *
      * @param path The path used to store the data
-     * @param nUsers The number of users to generate
-     * @param avg The average number of friends each user has
-     * @param std The stdandard deviation of the friends distribution
      */
     void provision(Path path)
             throws FileNotFoundException, IOException {
@@ -303,7 +341,7 @@ public class Implementation {
         String[] split = commandLine.split("\\s");
 
         Path path;
-        long nUsers;
+        int nUsers;
         int avg;
         float std;
         int uid, uid2;
@@ -332,7 +370,7 @@ public class Implementation {
                         throw new Exception(WRONG_PARAMETERS);
                     }
                     path = Paths.get(paramArray[0].trim());
-                    nUsers = Long.parseLong(paramArray[1].trim());
+                    nUsers = Integer.parseInt(paramArray[1].trim());
                     avg = Integer.parseInt(paramArray[2].trim());
                     std = Float.parseFloat(paramArray[3].trim());
                     result = new PopulateCommand(path, nUsers, avg, std);
@@ -402,7 +440,7 @@ public class Implementation {
                     case SET_SEED:
                         SetSeedCommand setSeedCmd = (SetSeedCommand) cmd;
                         setSeed(setSeedCmd.getSeed());
-                        writer.write(OK);                        
+                        writer.write(OK);
                         break;
                     case POPULATE:
                         PopulateCommand populateCmd = (PopulateCommand) cmd;
@@ -467,7 +505,7 @@ public class Implementation {
             }
         } catch (Exception ex) {
             try {
-                writer.write("Exception: " + ex.getMessage()+"\n");
+                writer.write("Exception: " + ex.getMessage() + "\n");
             } catch (IOException ex2) {
                 // Ignore Exceptions while writing error message to client
             }
