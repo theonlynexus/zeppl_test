@@ -38,14 +38,14 @@ import java.util.stream.Stream;
  */
 public class Implementation {
 
-    private String RUN_PROVISION_FIRST = "Please call \"provision\" first.";
-    private String UNKNOWN_COMMAND = "Unknown command.\n";
-    private String WRONG_PARAMETERS = "Wrong number of parameters.\n";
-    private String PATH_NOT_FOUND = "Path not found.\n";
-    private String DIRECTORY_NOT_EMPTY = "Directory not empty.\n";
-    private String NOT_A_DIRECTORY = "The given path is not a directory.\n";
-    private String OK = "OK\n";
-    private String PROMPT = ">";
+    private final String RUN_PROVISION_FIRST = "Please call \"provision\" first.";
+    private final String UNKNOWN_COMMAND = "Unknown command.\n";
+    private final String WRONG_PARAMETERS = "Wrong number of parameters.\n";
+    private final String PATH_NOT_FOUND = "Path not found.\n";
+    private final String DIRECTORY_NOT_EMPTY = "Directory not empty.\n";
+    private final String NOT_A_DIRECTORY = "The given path is not a directory.\n";
+    private final String OK = "OK\n";
+    private final String PROMPT = ">";
 
     private HashSet firstDegreeSet = null;
     private HashSet secondDegreeSet = null;
@@ -55,6 +55,7 @@ public class Implementation {
 
     /**
      * Infinite loop in which we accept connections and respond to requests
+     * @throws java.io.IOException
      */
     public void run() throws IOException {
         try (ServerSocket listener = new ServerSocket(9090)) {
@@ -338,7 +339,6 @@ public class Implementation {
             throws Exception {
         Command result = null;
 
-        String[] split = commandLine.split("\\s");
 
         Path path;
         int nUsers;
